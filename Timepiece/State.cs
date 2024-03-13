@@ -41,6 +41,26 @@ public class State<RouteType, NodeType>
     _symbolicStates = GetAllSymbolics(model, symbolics);
   }
 
+  public State(ZenSolution model, NodeType node, Zen<RouteType> route,
+    IEnumerable<ISymbolic> symbolics, SmtCheck check)
+  {
+    _check = check;
+    _time = Option.None<BigInteger>();
+    _nodeStates = new Dictionary<NodeType, RouteType> {{node, model.Get(route)}};
+    _symbolicStates = GetAllSymbolics(model, symbolics);
+  }
+
+  public State(ZenSolution model, NodeType node, Zen<RouteType> nodeRoute,
+    IEnumerable<KeyValuePair<NodeType, Zen<RouteType>>> neighborStates,
+    IEnumerable<ISymbolic> symbolics, SmtCheck check)
+  {
+    _check = check;
+    _time = Option.None<BigInteger>();
+    _focusedNode = Option.Some((node, model.Get(nodeRoute)));
+    _nodeStates = neighborStates.ToDictionary(p => p.Key, p => model.Get(p.Value));
+    _symbolicStates = GetAllSymbolics(model, symbolics);
+  }
+
   /// <summary>
   ///   Reconstruct the network state from the given inductive check model, focused on the given node and its neighbors.
   /// </summary>
@@ -134,6 +154,9 @@ public class State<RouteType, NodeType>
       SmtCheck.InductiveDelayed => "Inductive (delayed)",
       SmtCheck.Modular => "Modular",
       SmtCheck.ModularDelayed => "Modular (delayed)",
+      SmtCheck.UntilPre => "Pre-stable",
+      SmtCheck.UntilPost => "Post-stable",
+      SmtCheck.UntilLiveness => "Liveness",
       _ => throw new ArgumentOutOfRangeException()
     };
     Console.WriteLine($"{whichCheck} check failed!");

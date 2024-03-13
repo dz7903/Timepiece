@@ -62,8 +62,7 @@ public class SafetyNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, 
 
     var model = query.Solve();
     if (!model.IsSatisfiable()) return Option.None<State<RouteType, NodeType>>();
-    var state = new State<RouteType, NodeType>(model, node, route, Option.None<Zen<BigInteger>>(),
-      Symbolics, SmtCheck.Initial);
+    var state = new State<RouteType, NodeType>(model, node, route, Symbolics, SmtCheck.Initial);
     return Option.Some(state);
   }
 
@@ -83,9 +82,7 @@ public class SafetyNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, 
     var model = query.Solve();
 
     if (!model.IsSatisfiable()) return Option.None<State<RouteType, NodeType>>();
-    var state = new State<RouteType, NodeType>(
-      model, node, route, Option.None<Zen<BigInteger>>(), Symbolics,
-      SmtCheck.Safety);
+    var state = new State<RouteType, NodeType>(model, node, route, Symbolics, SmtCheck.Safety);
     return Option.Some(state);
   }
 
@@ -114,9 +111,7 @@ public class SafetyNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, 
 
     if (!model.IsSatisfiable()) return Option.None<State<RouteType, NodeType>>();
     var neighborRoutes = routes.Where(pair => Digraph[node].Contains(pair.Key));
-    var state = new State<RouteType, NodeType>(
-      model, node, newNodeRoute, neighborRoutes,
-      new BigInteger(0), Symbolics);
+    var state = new State<RouteType, NodeType>(model, node, newNodeRoute, neighborRoutes, Symbolics, SmtCheck.Inductive);
     return Option.Some(state);
   }
 

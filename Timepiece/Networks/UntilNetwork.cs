@@ -86,30 +86,27 @@ public class UntilNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, I
 
     var model = query.Solve();
     if (!model.IsSatisfiable()) return Option.None<State<RouteType, NodeType>>();
-    var state = new State<RouteType, NodeType>(model, node, route, Option.None<Zen<BigInteger>>(),
-      Symbolics, SmtCheck.Initial);
+    var state = new State<RouteType, NodeType>(model, node, route, Symbolics, SmtCheck.Initial);
     return Option.Some(state);
   }
 
   public Option<State<RouteType, NodeType>> CheckLiveness(NodeType node)
   {
     var route = Symbolic<RouteType>($"{node}-route");
-    var check = Implies(PhiAnnotations[node](route), LivenessProperties[node](route));
+    var check = Implies(PsiAnnotations[node](route), LivenessProperties[node](route));
 
     // negate and try to prove unsatisfiable.
     var query = And(GetSymbolicConstraints(), Not(check));
     if (PrintFormulas)
     {
-      Console.WriteLine($"Safety check at {node}: ");
+      Console.WriteLine($"Liveness check at {node}: ");
       Console.WriteLine(query.Format());
     }
 
     var model = query.Solve();
 
     if (!model.IsSatisfiable()) return Option.None<State<RouteType, NodeType>>();
-    var state = new State<RouteType, NodeType>(
-      model, node, route, Option.None<Zen<BigInteger>>(), Symbolics,
-      SmtCheck.Safety);
+    var state = new State<RouteType, NodeType>(model, node, route, Symbolics, SmtCheck.UntilLiveness);
     return Option.Some(state);
   }
 
@@ -142,7 +139,7 @@ public class UntilNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, I
     var query = And(GetSymbolicConstraints(), Not(check));
     if (PrintFormulas)
     {
-      Console.WriteLine($"Inductive check at {node}: ");
+      Console.WriteLine($"Pre-stable check at {node}: ");
       Console.WriteLine(query.Format());
     }
 
@@ -150,9 +147,7 @@ public class UntilNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, I
 
     if (!model.IsSatisfiable()) return Option.None<State<RouteType, NodeType>>();
     var neighborRoutes = routes.Where(pair => Digraph[node].Contains(pair.Key));
-    var state = new State<RouteType, NodeType>(
-      model, node, newNodeRoute, neighborRoutes,
-      new BigInteger(0), Symbolics);
+    var state = new State<RouteType, NodeType>(model, node, newNodeRoute, neighborRoutes, Symbolics, SmtCheck.UntilPre);
     return Option.Some(state);
   }
 
@@ -181,7 +176,7 @@ public class UntilNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, I
     var query = And(GetSymbolicConstraints(), Not(check));
     if (PrintFormulas)
     {
-      Console.WriteLine($"Inductive check at {node}: ");
+      Console.WriteLine($"Post-stable check at {node}: ");
       Console.WriteLine(query.Format());
     }
 
@@ -189,9 +184,7 @@ public class UntilNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, I
 
     if (!model.IsSatisfiable()) return Option.None<State<RouteType, NodeType>>();
     var neighborRoutes = routes.Where(pair => Digraph[node].Contains(pair.Key));
-    var state = new State<RouteType, NodeType>(
-      model, node, newNodeRoute, neighborRoutes,
-      new BigInteger(0), Symbolics);
+    var state = new State<RouteType, NodeType>(model, node, newNodeRoute, neighborRoutes, Symbolics, SmtCheck.UntilPost);
     return Option.Some(state);
   }
 

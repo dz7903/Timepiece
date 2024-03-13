@@ -11,6 +11,9 @@ public enum SmtCheck
   Safety,
   Modular,
   ModularDelayed,
+  UntilPre,
+  UntilPost,
+  UntilLiveness
 }
 
 public static class SmtCheckExtensions
