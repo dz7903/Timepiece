@@ -32,6 +32,9 @@ var queryArgument =
   new Argument<QueryType>("query",
     description: "The type of query to check",
     parse: result => result.Tokens.Single().Value.ToQueryType());
+var fastOption = new System.CommandLine.Option<bool>(
+  new[] {"--fast", "-f" },
+  "If given, use exceptions to end verification early if counterexamples found.");
 rootCommand.AddCommand(listQueriesCommand);
 rootCommand.AddCommand(runCommand);
 runCommand.Add(fileArgument);
@@ -40,8 +43,9 @@ runCommand.Add(monoOption);
 runCommand.Add(queryOption);
 runCommand.Add(trackTermsOption);
 runCommand.Add(prefixDepthOption);
+runCommand.Add(fastOption);
 runCommand.SetHandler(
-  (file, queryType, mono, printQuery, trackTerms, prefixDepth) =>
+  (file, queryType, mono, printQuery, trackTerms, prefixDepth, fast) =>
   {
     var json = new JsonTextReader(new StreamReader(file));
 
@@ -104,12 +108,31 @@ runCommand.SetHandler(
         QueryType.FatHijackFilteringAllToR => AnglerFatTreeNetwork.FatTreeHijackFilteringAllToR(
           FatTree.LabelFatTree(topology, externalNodes), externalNodes, transfer,
           ast.Nodes.ToDictionary(p => p.Key, p => p.Value.Prefixes)),
+
+        QueryType.Internet2BlockToExternalSafety => AnglerInternet2Safety.BlockToExternal(topology, externalNodes, transfer),
+        QueryType.Internet2NoMartiansSafety => AnglerInternet2Safety.NoMartians(topology, externalNodes, transfer),
+        QueryType.Internet2NoMartiansContraSafety => AnglerInternet2Safety.NoMartiansContrapositive(topology, externalNodes,
+          transfer),
+        QueryType.Internet2NoPrivateAsSafety => AnglerInternet2Safety.NoPrivateAs(topology, externalNodes, transfer),
+        QueryType.Internet2NoPrivateAsContraSafety => AnglerInternet2Safety.NoPrivateAsContrapositive(topology, externalNodes,
+          transfer),
+        QueryType.Internet2ReachableUntil => AnglerInternet2Until.ReachableSymbolicPrefix(topology,
+          externalNodes.ToDictionary(e => e, e =>
+          {
+            var prefixes = Internet2Prefixes.GetParticipantPrefixes(e);
+            return prefixDepth.HasValue ? prefixes.Take(prefixDepth.Value) : prefixes;
+          }),
+          transfer),
+        QueryType.Internet2ReachableInternalUntil => AnglerInternet2Until.ReachableInternal(topology, transfer),
+
         _ => throw new ArgumentOutOfRangeException(nameof(queryType), queryType, "Query type not supported!")
       };
 
       // turn on query printing if true
       net.PrintFormulas = printQuery;
-      if (mono)
+      if (fast)
+        Profile.RunAnnotatedWithExceptionWithStats(net);
+      else if (mono)
         Profile.RunMonoWithStats(net);
       else
         Profile.RunAnnotatedWithStats(net);
@@ -118,6 +141,6 @@ runCommand.SetHandler(
     {
       Console.WriteLine("Failed to deserialize contents of {file} (received null).");
     }
-  }, fileArgument, queryArgument, monoOption, queryOption, trackTermsOption, prefixDepthOption);
+  }, fileArgument, queryArgument, monoOption, queryOption, trackTermsOption, prefixDepthOption, fastOption);
 
 await rootCommand.InvokeAsync(args);

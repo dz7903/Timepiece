@@ -14,8 +14,8 @@ namespace Timepiece.Networks;
 /// </summary>
 /// <typeparam name="RouteType">The type of the routes.</typeparam>
 /// <typeparam name="NodeType">The type of nodes.</typeparam>
-public class AnnotatedNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, IAnnotated<RouteType, NodeType>
-  where NodeType : notnull
+public class AnnotatedNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, IAnnotated<RouteType, NodeType>,
+  ICheckable<RouteType, NodeType> where NodeType : notnull
 {
   /// <summary>
   ///   Construct a new <c>AnnotatedNetwork{T,TV,TS}</c>.
@@ -199,7 +199,7 @@ public class AnnotatedNetwork<RouteType, NodeType> : Network<RouteType, NodeType
     return CheckAnnotations(node, NeighborRoutes(node), Symbolic<BigInteger>("time"));
   }
 
-  private Option<State<RouteType, NodeType>> CheckAnnotations(NodeType node,
+  public Option<State<RouteType, NodeType>> CheckAnnotations(NodeType node,
     IReadOnlyDictionary<NodeType, Zen<RouteType>> routes,
     Zen<BigInteger> time)
   {

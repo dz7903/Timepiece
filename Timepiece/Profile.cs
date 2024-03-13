@@ -90,6 +90,44 @@ public static class Profile
     }
   }
 
+  public static void RunAnnotatedWithExceptionWithStats<RouteType, NodeType>(
+    ICheckable<RouteType, NodeType> annotatedNetwork)
+  {
+    var processes = Environment.ProcessorCount;
+    Console.WriteLine($"Environment.ProcessorCount: {processes}");
+    var numNodes = annotatedNetwork.Digraph.Nodes.Count;
+    var nodeTimes = new ConcurrentDictionary<NodeType, long>(processes * 2, numNodes);
+    long? t = null;
+    try
+    {
+      t = Time(net =>
+      {
+        net.CheckAnnotationsWithExceptionWith(nodeTimes, LogCheckTimeAction);
+        Console.WriteLine("    All the modular checks passed!");
+      }, annotatedNetwork);
+      Console.WriteLine($"Modular verification took {t}ms");
+    }
+    catch (ZenException e)
+    {
+      Console.WriteLine("Error, modular verification did not complete:");
+      Console.WriteLine(e.Message);
+    }
+    catch (CheckException<RouteType, NodeType> e)
+    {
+      Console.WriteLine("counterexample found!");
+      e.State.ReportCheckFailure();
+      Console.WriteLine();
+    }
+    finally
+    {
+      if (!nodeTimes.IsEmpty)
+      {
+        Console.WriteLine("Statistics:");
+        StatisticsExtensions.ReportTimes(nodeTimes, Statistics.Summary, t, true);
+      }
+    }
+  }
+
   /// <summary>
   ///   Return the milliseconds taken by the given action on the given input.
   /// </summary>
@@ -111,5 +149,14 @@ public static class Profile
     // add the time to the dictionary
     times.Add(node, timer.ElapsedMilliseconds);
     return s;
+  }
+
+  public static void LogCheckTimeAction<NodeType>(NodeType node, IDictionary<NodeType, long> times,
+    Action checkFunction)
+  {
+    var timer = Stopwatch.StartNew();
+    checkFunction();
+    // add the time to the dictionary
+    times.Add(node, timer.ElapsedMilliseconds);
   }
 }

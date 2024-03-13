@@ -22,7 +22,14 @@ public enum QueryType
   FatValleyFreedom,
   FatValleyFreedomAllToR,
   FatHijackFiltering,
-  FatHijackFilteringAllToR
+  FatHijackFilteringAllToR,
+  Internet2BlockToExternalSafety,
+  Internet2NoMartiansSafety,
+  Internet2NoMartiansContraSafety,
+  Internet2NoPrivateAsSafety,
+  Internet2NoPrivateAsContraSafety,
+  Internet2ReachableUntil,
+  Internet2ReachableInternalUntil,
 }
 
 public static class QueryTypeExtensions
@@ -50,6 +57,13 @@ public static class QueryTypeExtensions
       QueryType.FatValleyFreedomAllToR => "fatValleyAll",
       QueryType.FatHijackFiltering => "fatHijack",
       QueryType.FatHijackFilteringAllToR => "fatHijackAll",
+      QueryType.Internet2BlockToExternalSafety => "bteS",
+      QueryType.Internet2NoMartiansSafety => "marsS",
+      QueryType.Internet2NoMartiansContraSafety => "marsCS",
+      QueryType.Internet2NoPrivateAsSafety => "privateS",
+      QueryType.Internet2NoPrivateAsContraSafety => "privateCS",
+      QueryType.Internet2ReachableUntil => "reachU",
+      QueryType.Internet2ReachableInternalUntil => "reachInternalU",
       _ => throw new ArgumentOutOfRangeException(nameof(qt), qt, $"Invalid {nameof(QueryType)} with no shorthand.")
     };
   }
