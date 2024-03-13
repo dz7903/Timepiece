@@ -112,11 +112,19 @@ public static class Profile
       Console.WriteLine("Error, modular verification did not complete:");
       Console.WriteLine(e.Message);
     }
-    catch (CheckException<RouteType, NodeType> e)
+    catch (AggregateException ae)
     {
       Console.WriteLine("counterexample found!");
-      e.State.ReportCheckFailure();
-      Console.WriteLine();
+      ae.Handle((e) =>
+      {
+        if (e is CheckException<RouteType, NodeType> ex)
+        {
+          ex.State.ReportCheckFailure();
+          Console.WriteLine();
+          return true;
+        }
+        return false;
+      });
     }
     finally
     {
