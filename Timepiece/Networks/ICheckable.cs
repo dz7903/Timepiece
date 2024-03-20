@@ -11,29 +11,22 @@ public interface ICheckable<RouteType, NodeType>
 {
   public Digraph<NodeType> Digraph { get; }
 
-  public Option<State<RouteType, NodeType>> CheckAnnotations(NodeType node,
-    IReadOnlyDictionary<NodeType, Zen<RouteType>> routes,
-    Zen<BigInteger> time);
-
-  private Dictionary<NodeType, Zen<RouteType>> NodeRoutes() =>
-    Digraph.MapNodes(node => Zen.Symbolic<RouteType>($"{node}-route"));
-
-  public void CheckAnnotationsWithExceptionWith<TAcc>(
+  public Dictionary<NodeType, Option<State<RouteType, NodeType>>> CheckAnnotationsWith<TAcc>(
     TAcc collector,
-    Action<NodeType, TAcc, Action> f)
+    Func<NodeType, TAcc, Func<Option<State<RouteType, NodeType>>>,
+      Option<State<RouteType, NodeType>>> f);
+
+  public void CheckAnnotationsFastWith<TAcc>(
+    TAcc collector,
+    Func<NodeType, TAcc, Func<Option<State<RouteType, NodeType>>>,
+      Option<State<RouteType, NodeType>>> f)
   {
-    var routes = NodeRoutes();
-    var time = Zen.Symbolic<BigInteger>("time");
-    Parallel.ForEach(Digraph.Nodes, node =>
+    CheckAnnotationsWith(collector, (node, collector, g) =>
     {
-      f(node, collector, () =>
-      {
-        Option<State<RouteType, NodeType>> result = CheckAnnotations(node, routes, time);
-        if (result.HasValue)
-        {
-          throw new CheckException<RouteType, NodeType>(result.Value);
-        }
-      });
+      var result = f(node, collector, g);
+      if (result.HasValue)
+        throw new CheckException<RouteType, NodeType>(result.Value);
+      return Option.None<State<RouteType, NodeType>>();
     });
   }
 }

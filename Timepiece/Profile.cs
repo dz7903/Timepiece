@@ -38,7 +38,7 @@ public static class Profile
     }
   }
 
-  public static void RunAnnotatedWithStats<RouteType, NodeType>(AnnotatedNetwork<RouteType, NodeType> annotatedNetwork)
+  public static void RunAnnotatedWithStats<RouteType, NodeType>(ICheckable<RouteType, NodeType> annotatedNetwork)
   {
     var processes = Environment.ProcessorCount;
     Console.WriteLine($"Environment.ProcessorCount: {processes}");
@@ -90,7 +90,7 @@ public static class Profile
     }
   }
 
-  public static void RunAnnotatedWithExceptionWithStats<RouteType, NodeType>(
+  public static void RunAnnotatedFastWithStats<RouteType, NodeType>(
     ICheckable<RouteType, NodeType> annotatedNetwork)
   {
     var processes = Environment.ProcessorCount;
@@ -102,7 +102,7 @@ public static class Profile
     {
       t = Time(net =>
       {
-        net.CheckAnnotationsWithExceptionWith(nodeTimes, LogCheckTimeAction);
+        net.CheckAnnotationsFastWith(nodeTimes, LogCheckTime);
         Console.WriteLine("    All the modular checks passed!");
       }, annotatedNetwork);
       Console.WriteLine($"Modular verification took {t}ms");
@@ -157,14 +157,5 @@ public static class Profile
     // add the time to the dictionary
     times.Add(node, timer.ElapsedMilliseconds);
     return s;
-  }
-
-  public static void LogCheckTimeAction<NodeType>(NodeType node, IDictionary<NodeType, long> times,
-    Action checkFunction)
-  {
-    var timer = Stopwatch.StartNew();
-    checkFunction();
-    // add the time to the dictionary
-    times.Add(node, timer.ElapsedMilliseconds);
   }
 }

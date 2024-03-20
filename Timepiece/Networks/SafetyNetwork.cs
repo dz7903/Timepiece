@@ -42,14 +42,24 @@ public class SafetyNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, 
 
   public bool PrintFormulas { get; set; }
 
-  public Option<State<RouteType, NodeType>> CheckAnnotations(NodeType node,
-    IReadOnlyDictionary<NodeType, Zen<RouteType>> routes,
-    Zen<BigInteger> time)
+  public Dictionary<NodeType, Option<State<RouteType, NodeType>>> CheckAnnotationsWith<TAcc>(TAcc collector, Func<NodeType, TAcc, Func<Option<State<RouteType, NodeType>>>, Option<State<RouteType, NodeType>>> f)
+  {
+    var routes = Digraph.MapNodes(node => Symbolic<RouteType>($"{node}-route"));
+    var s = Digraph.Nodes
+      // call f for each node
+      .AsParallel()
+      .Select(node => (node, f(node, collector, () => CheckAnnotations(node, routes))))
+      .ToDictionary(x => x.Item1, x => x.Item2);
+    return s;
+  }
+
+  private Option<State<RouteType, NodeType>> CheckAnnotations(NodeType node,
+    IReadOnlyDictionary<NodeType, Zen<RouteType>> routes)
   {
     return CheckInitial(node).OrElse(() => CheckInductive(node, routes)).OrElse(() => CheckSafety(node));
   }
 
-  private Option<State<RouteType, NodeType>> CheckInitial(NodeType node)
+  protected Option<State<RouteType, NodeType>> CheckInitial(NodeType node)
   {
     var route = Symbolic<RouteType>($"{node}-route");
     var check = Implies(route == InitialValues[node], Annotations[node](route));
@@ -66,7 +76,7 @@ public class SafetyNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, 
     return Option.Some(state);
   }
 
-  private Option<State<RouteType, NodeType>> CheckSafety(NodeType node)
+  protected Option<State<RouteType, NodeType>> CheckSafety(NodeType node)
   {
     var route = Symbolic<RouteType>($"{node}-route");
     var check = Implies(Annotations[node](route), SafetyProperties[node](route));
@@ -86,7 +96,7 @@ public class SafetyNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, 
     return Option.Some(state);
   }
 
-  private Option<State<RouteType, NodeType>> CheckInductive(NodeType node,
+  protected Option<State<RouteType, NodeType>> CheckInductive(NodeType node,
     IReadOnlyDictionary<NodeType, Zen<RouteType>> routes)
   {
     // get the new route as the merge of all neighbors

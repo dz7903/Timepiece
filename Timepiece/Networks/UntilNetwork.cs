@@ -57,9 +57,20 @@ public class UntilNetwork<RouteType, NodeType> : Network<RouteType, NodeType>, I
 
   public bool PrintFormulas { get; set; }
 
+  public Dictionary<NodeType, Option<State<RouteType, NodeType>>> CheckAnnotationsWith<TAcc>(TAcc collector, Func<NodeType, TAcc, Func<Option<State<RouteType, NodeType>>>, Option<State<RouteType, NodeType>>> f)
+  {
+
+    var routes = Digraph.MapNodes(node => Symbolic<RouteType>($"{node}-route"));
+    var s = Digraph.Nodes
+      // call f for each node
+      .AsParallel()
+      .Select(node => (node, f(node, collector, () => CheckAnnotations(node, routes))))
+      .ToDictionary(x => x.Item1, x => x.Item2);
+    return s;
+  }
+
   public Option<State<RouteType, NodeType>> CheckAnnotations(NodeType node,
-    IReadOnlyDictionary<NodeType, Zen<RouteType>> routes,
-    Zen<BigInteger> time)
+    IReadOnlyDictionary<NodeType, Zen<RouteType>> routes)
   {
     return CheckInitial(node)
       .OrElse(() => CheckPre(node, routes))

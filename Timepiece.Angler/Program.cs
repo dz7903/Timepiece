@@ -3,7 +3,9 @@ using System.Diagnostics;
 using Newtonsoft.Json;
 using Timepiece;
 using Timepiece.Angler.Ast;
+using Timepiece.Angler.DataTypes;
 using Timepiece.Angler.Networks;
+using Timepiece.Networks;
 using ZenLib;
 
 ZenSettings.UseLargeStack = true;
@@ -125,13 +127,17 @@ runCommand.SetHandler(
           transfer),
         QueryType.Internet2ReachableInternalUntil => AnglerInternet2Until.ReachableInternal(topology, transfer),
 
+        QueryType.Internet2BlockToExternalSafetyEdge =>
+          new SafetyNetworkEdge<RouteEnvironment, string>(
+            AnglerInternet2Safety.BlockToExternal(topology, externalNodes, transfer)),
+
         _ => throw new ArgumentOutOfRangeException(nameof(queryType), queryType, "Query type not supported!")
       };
 
       // turn on query printing if true
       net.PrintFormulas = printQuery;
       if (fast)
-        Profile.RunAnnotatedWithExceptionWithStats(net);
+        Profile.RunAnnotatedFastWithStats(net);
       else if (mono)
         Profile.RunMonoWithStats(net);
       else

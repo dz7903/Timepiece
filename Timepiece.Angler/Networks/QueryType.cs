@@ -30,6 +30,7 @@ public enum QueryType
   Internet2NoPrivateAsContraSafety,
   Internet2ReachableUntil,
   Internet2ReachableInternalUntil,
+  Internet2BlockToExternalSafetyEdge,
 }
 
 public static class QueryTypeExtensions
@@ -64,6 +65,7 @@ public static class QueryTypeExtensions
       QueryType.Internet2NoPrivateAsContraSafety => "privateCS",
       QueryType.Internet2ReachableUntil => "reachU",
       QueryType.Internet2ReachableInternalUntil => "reachInternalU",
+      QueryType.Internet2BlockToExternalSafetyEdge => "bteSE",
       _ => throw new ArgumentOutOfRangeException(nameof(qt), qt, $"Invalid {nameof(QueryType)} with no shorthand.")
     };
   }
