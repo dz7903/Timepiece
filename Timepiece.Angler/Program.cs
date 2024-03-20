@@ -130,6 +130,12 @@ runCommand.SetHandler(
         QueryType.Internet2BlockToExternalSafetyEdge =>
           new SafetyNetworkEdge<RouteEnvironment, string>(
             AnglerInternet2Safety.BlockToExternal(topology, externalNodes, transfer)),
+        QueryType.Internet2NoMartiansSafetyEdge =>
+          new SafetyNetworkEdge<RouteEnvironment, string>(
+            AnglerInternet2Safety.NoMartians(topology, externalNodes, transfer)),
+        QueryType.Internet2NoMartiansContraSafetyEdge =>
+          new SafetyNetworkEdge<RouteEnvironment, string>(
+            AnglerInternet2Safety.NoMartiansContrapositive(topology, externalNodes, transfer)),
 
         _ => throw new ArgumentOutOfRangeException(nameof(queryType), queryType, "Query type not supported!")
       };
