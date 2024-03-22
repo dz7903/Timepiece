@@ -136,6 +136,18 @@ runCommand.SetHandler(
         QueryType.Internet2NoMartiansContraSafetyEdge =>
           new SafetyNetworkEdge<RouteEnvironment, string>(
             AnglerInternet2Safety.NoMartiansContrapositive(topology, externalNodes, transfer)),
+        QueryType.Internet2ReachableUntilEdge =>
+          new UntilNetworkEdge<RouteEnvironment, string>(
+            AnglerInternet2Until.ReachableSymbolicPrefix(topology,
+              externalNodes.ToDictionary(e => e, e =>
+              {
+                var prefixes = Internet2Prefixes.GetParticipantPrefixes(e);
+                return prefixDepth.HasValue ? prefixes.Take(prefixDepth.Value) : prefixes;
+              }),
+              transfer)),
+        QueryType.Internet2ReachableInternalUntilEdge =>
+          new UntilNetworkEdge<RouteEnvironment, string>(
+            AnglerInternet2Until.ReachableInternal(topology, transfer)),
 
         _ => throw new ArgumentOutOfRangeException(nameof(queryType), queryType, "Query type not supported!")
       };
