@@ -84,8 +84,8 @@ public static class StatisticsExtensions
           case Statistics.Average:
             headers.Append($"\t{stat.ShortHand()}");
             var avg = times.Average(p => p.Value);
-            Console.WriteLine($"Average time: {avg}ms");
-            data.Append($"\t{avg}");
+            Console.WriteLine($"Average time: {avg:0.00}ms");
+            data.Append($"\t{avg:0.00}");
             break;
           case Statistics.Median:
             headers.Append($"\t{stat.ShortHand()}");
