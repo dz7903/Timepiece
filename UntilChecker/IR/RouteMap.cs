@@ -30,10 +30,7 @@ public record Clause(
 {
   public Zen<RouteEnvironment> TransferFunction(Zen<RouteEnvironment> r, Zen<RouteEnvironment> otherwise)
   {
-    var matched =
-      MatchList != null && MatchList.Count != 0 ?
-        Zen.And(MatchList.Select(line => line.Match(r))) :
-        Zen.True();
+    var matched = MatchList != null ? ZenExtension.And(MatchList.Select(line => line.Match(r))) : Zen.True();
     var afterSet = SetList != null ? SetList.Aggregate(r, (after, line) => line.Apply(after)) : r;
     return Zen.If(matched, IsPermit(Action) ? afterSet : Zen.Constant(new RouteEnvironment()), otherwise);
   }
@@ -42,9 +39,7 @@ public record Clause(
   {
     // (template, disable)
     var matchTemplates =
-      MatchList != null ?
-        MatchList.Select(line => (line.GenerateTemplate(args), Zen.Symbolic<bool>())).ToList() :
-        [];
+      MatchList != null ? MatchList.Select(line => (line.GenerateTemplate(args), Zen.Symbolic<bool>())).ToList() : [];
     for (var i = 0; i < args.ExtraMatchLines; i++)
       matchTemplates.Add((MatchCommunity.GenerateFreshTemplate(args), Zen.Symbolic<bool>()));
     var setTemplates =
@@ -55,7 +50,7 @@ public record Clause(
     return new Template<Func<Zen<RouteEnvironment>, Zen<RouteEnvironment>, Zen<RouteEnvironment>>, Clause>(
       (r, other) =>
         Zen.If(
-          Zen.And(
+          ZenExtension.And(
             matchTemplates.Select(p =>
               Zen.If(p.Item2, Zen.True(), p.Item1.TransferFunction(r)))),
           Zen.If(
@@ -70,16 +65,22 @@ public record Clause(
         setTemplates.Aggregate(Zen.Constant(BigInteger.Zero), (sum, p) =>
           sum + Zen.If(p.Item2, new BigInteger(10), p.Item1.Cost)),
       Zen.And(
-        Zen.And(matchTemplates.Select(p => p.Item1.Constraint)),
-        Zen.And(setTemplates.Select(p => p.Item1.Constraint))),
-      model => new Clause(
+        ZenExtension.And(matchTemplates.Select(p => p.Item1.Constraint)),
+        ZenExtension.And(setTemplates.Select(p => p.Item1.Constraint))),
+      model =>
+      {
+        // Console.Write("match disabled: ");
+        // foreach (var p in matchTemplates) Console.Write($"{model.Get(p.Item2)}");
+        // Console.WriteLine();
+        return new Clause(
           model.Get(toggleAction) ? Toggle(Action) : Action,
           MapName,
           SeqNum,
           matchTemplates.Where(p => !model.Get(p.Item2))
             .Select(p => p.Item1.Repair(model)).ToList(),
           setTemplates.Where(p => !model.Get(p.Item2))
-            .Select(p => p.Item1.Repair(model)).ToList())
+            .Select(p => p.Item1.Repair(model)).ToList());
+      }
       );
   }
 
@@ -93,7 +94,7 @@ public record Clause(
     return new Template<Func<Zen<RouteEnvironment>, Zen<RouteEnvironment>, Zen<RouteEnvironment>>, Clause>(
       (r, other) =>
         Zen.If(
-          Zen.And(matchTemplates.Select(template => template.TransferFunction(r))),
+          ZenExtension.And(matchTemplates.Select(template => template.TransferFunction(r))),
           Zen.If(isPermit,
             setTemplates.Aggregate(r, (after, template) => template.TransferFunction(after)),
             Zen.Constant(new RouteEnvironment())),
@@ -102,8 +103,8 @@ public record Clause(
       + matchTemplates.Aggregate(Zen.Constant(BigInteger.Zero), (sum, template) => sum + template.Cost)
       + setTemplates.Aggregate(Zen.Constant(BigInteger.Zero), (sum, template) => sum + template.Cost),
       Zen.And(
-        Zen.And(matchTemplates.Select(template => template.Constraint)),
-        Zen.And(setTemplates.Select(template => template.Constraint))),
+        ZenExtension.And(matchTemplates.Select(template => template.Constraint)),
+        ZenExtension.And(setTemplates.Select(template => template.Constraint))),
       model => new Clause(
         model.Get(isPermit) ? ClauseAction.Permit : ClauseAction.Deny,
         name,
@@ -167,16 +168,16 @@ public record MatchCommunity(
   [JsonProperty("communities", Required = Required.Always)]
   List<string> Communities) : MatchLine
 {
-  public override Zen<bool> Match(Zen<RouteEnvironment> r) => Zen.Or(Communities.Select(r.HasCommunity));
+  public override Zen<bool> Match(Zen<RouteEnvironment> r) => ZenExtension.Or(Communities.Select(r.HasCommunity));
   public override Template<Func<Zen<RouteEnvironment>, Zen<bool>>, MatchLine> GenerateTemplate(TemplateArguments args)
   {
     var disable = Communities.ToDictionary(tag => tag, tag => Zen.Symbolic<bool>($"disable-{tag}"));
     return new Template<Func<Zen<RouteEnvironment>, Zen<bool>>, MatchLine>(
-      r => Zen.Or(Communities.Select(tag => Zen.And(Zen.Not(disable[tag]), r.HasCommunity(tag)))),
+      r => ZenExtension.Or(Communities.Select(tag => Zen.And(Zen.Not(disable[tag]), r.HasCommunity(tag)))),
       Communities.Aggregate(
         Zen.Constant(BigInteger.Zero),
         (sum, tag) => sum + Zen.If(disable[tag], Zen.Constant(BigInteger.One), Zen.Constant(BigInteger.Zero))),
-      Zen.Or(disable.Select(p => Zen.Not(p.Value))), // At least one tag is needed in the match clause
+      ZenExtension.Or(disable.Select(p => Zen.Not(p.Value))), // At least one tag is needed in the match clause
       model => new MatchCommunity(Communities.Where(tag => !model.Get(disable[tag])).ToList()));
   }
 
@@ -184,11 +185,11 @@ public record MatchCommunity(
   {
     var enable = args.TagsCollection.ToDictionary(tag => tag, tag => Zen.Symbolic<bool>($"enable-{tag}"));
     return new Template<Func<Zen<RouteEnvironment>, Zen<bool>>, MatchLine>(
-      r => Zen.Or(args.TagsCollection.Select(tag => Zen.And(enable[tag], r.HasCommunity(tag)))),
+      r => ZenExtension.Or(args.TagsCollection.Select(tag => Zen.And(enable[tag], r.HasCommunity(tag)))),
       args.TagsCollection.Aggregate(
         Zen.Constant(BigInteger.Zero),
         (sum, tag) => sum + Zen.If(enable[tag], Zen.Constant(new BigInteger(100)), Zen.Constant(BigInteger.Zero))),
-      Zen.Or(enable.Select(p => p.Value)), // At least one tag is needed in the match clause
+      ZenExtension.Or(enable.Select(p => p.Value)), // At least one tag is needed in the match clause
       model => new MatchCommunity(args.TagsCollection.Where(tag => model.Get(enable[tag])).ToList()));
   }
 

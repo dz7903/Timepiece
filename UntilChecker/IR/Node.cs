@@ -93,7 +93,7 @@ public static class RouteMap
         Zen.Constant(BigInteger.Zero),
         (sum, p) =>
           Zen.If(p.Item2, Zen.Constant(new BigInteger(2)), p.Item1.Cost)),
-      Zen.And(templates.Select(p => p.Item1.Constraint)),
+      ZenExtension.And(templates.Select(p => p.Item1.Constraint)),
       model =>
         templates.Where(p => !model.Get(p.Item2))
           .Select(p => p.Item1.Repair(model)).ToList());
