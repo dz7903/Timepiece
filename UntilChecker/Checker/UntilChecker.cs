@@ -23,6 +23,33 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
   public readonly IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> PsiAnnotations = psiAnnotations;
   public readonly IDictionary<NodeType, Zen<BigInteger>> Ranks = ranks;
 
+  public Zen<bool> PreCheckCondition(
+    NodeType src, NodeType dst, Zen<RouteType> srcState, Zen<RouteType> dstState, Zen<RouteType> newDstState) =>
+    Zen.Implies(
+      Zen.And(
+        Zen.Or(PhiAnnotations[src](srcState), PsiAnnotations[src](srcState)),
+        Zen.Implies(Ranks[src] > Ranks[dst], PhiAnnotations[src](srcState)),
+        PhiAnnotations[dst](dstState)),
+      Zen.Or(PhiAnnotations[dst](newDstState), PsiAnnotations[dst](newDstState)));
+
+  public Zen<bool> PostCheckCondition(
+    NodeType src, NodeType dst, Zen<RouteType> srcState, Zen<RouteType> dstState, Zen<RouteType> newDstState) =>
+    Zen.Implies(
+      Zen.And(
+        Zen.Or(PhiAnnotations[src](srcState), PsiAnnotations[src](srcState)),
+        PsiAnnotations[dst](dstState)),
+      PsiAnnotations[dst](newDstState));
+
+  public Zen<bool> LivenessCheckCondition(
+    NodeType src, NodeType dst, Zen<RouteType> srcState, Zen<RouteType> dstState, Zen<RouteType> newDstState) =>
+    Zen.Implies(
+      Zen.And(
+        Ranks[src] < Ranks[dst],
+        Zen.Or(PhiAnnotations[dst](dstState), PsiAnnotations[dst](dstState)),
+        PsiAnnotations[src](srcState)),
+      PsiAnnotations[dst](newDstState));
+
+
   protected override IDictionary<string, Func<Option<CheckError>>> GenerateTasks()
   {
     var tasks = new Dictionary<string, Func<Option<CheckError>>>();
@@ -51,22 +78,9 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
         routes[node],
         Network.TransferFunctions[(neighbor, node)](routes[neighbor]));
 
-      var preCheck = Zen.Implies(
-        Zen.And(
-          Zen.Or(PhiAnnotations[neighbor](routes[neighbor]), PsiAnnotations[neighbor](routes[neighbor])),
-          PhiAnnotations[node](routes[node])),
-        Zen.Or(PhiAnnotations[node](newRoute), PsiAnnotations[node](newRoute)));
-      var postCheck = Zen.Implies(
-        Zen.And(
-          Zen.Or(PhiAnnotations[neighbor](routes[neighbor]), PsiAnnotations[neighbor](routes[neighbor])),
-          PsiAnnotations[node](routes[node])),
-        PsiAnnotations[node](newRoute));
-      var livenessCheck = Zen.Implies(
-        Zen.And(
-          Ranks[neighbor] < Ranks[node],
-          Zen.Or(PhiAnnotations[node](routes[node]), PsiAnnotations[node](routes[node])),
-          PsiAnnotations[neighbor](routes[neighbor])),
-        PsiAnnotations[node](newRoute));
+      var preCheck = PreCheckCondition(neighbor, node, routes[neighbor], routes[node], newRoute);
+      var postCheck = PostCheckCondition(neighbor, node, routes[neighbor], routes[node], newRoute);
+      var livenessCheck = LivenessCheckCondition(neighbor, node, routes[neighbor], routes[node], newRoute);
 
       tasks.Add($"edge-{neighbor},{node}", () =>
       {
@@ -186,22 +200,9 @@ public static class UntilCheckerExtension
                   importTemplate.TransferFunction(exportTemplate.TransferFunction(srcState))
                     .IncrementAsPathLength(BigInteger.One)
                     .AddAsSet(config.NodeConfigs[src].LocalAs));
-                var preCheck = Zen.Implies(
-                  Zen.And(
-                    Zen.Or(checker.PhiAnnotations[src](srcState), checker.PsiAnnotations[src](srcState)),
-                    checker.PhiAnnotations[dst](dstState)),
-                  Zen.Or(checker.PhiAnnotations[dst](newDstState), checker.PsiAnnotations[dst](newDstState)));
-                var postCheck = Zen.Implies(
-                  Zen.And(
-                    Zen.Or(checker.PhiAnnotations[src](srcState), checker.PsiAnnotations[src](srcState)),
-                    checker.PsiAnnotations[dst](dstState)),
-                  checker.PsiAnnotations[dst](newDstState));
-                var livenessCheck = Zen.Implies(
-                  Zen.And(
-                    checker.Ranks[src] < checker.Ranks[dst],
-                    Zen.Or(checker.PhiAnnotations[dst](dstState), checker.PsiAnnotations[dst](dstState)),
-                    checker.PsiAnnotations[src](srcState)),
-                  checker.PsiAnnotations[dst](newDstState));
+                var preCheck = checker.PreCheckCondition(src, dst, srcState, dstState, newDstState);
+                var postCheck = checker.PostCheckCondition(src, dst, srcState, dstState, newDstState);
+                var livenessCheck = checker.LivenessCheckCondition(src, dst, srcState, dstState, newDstState);
                 return Zen.And(preCheck, postCheck, livenessCheck);
               }))));
 
@@ -220,22 +221,9 @@ public static class UntilCheckerExtension
           importProposal.Transfer(exportProposal.Transfer(srcState))
             .IncrementAsPathLength(BigInteger.One)
             .AddAsSet(config.NodeConfigs[src].LocalAs));
-        var preCheck = Zen.Implies(
-          Zen.And(
-            Zen.Or(checker.PhiAnnotations[src](srcState), checker.PsiAnnotations[src](srcState)),
-            checker.PhiAnnotations[dst](dstState)),
-          Zen.Or(checker.PhiAnnotations[dst](newDstState), checker.PsiAnnotations[dst](newDstState)));
-        var postCheck = Zen.Implies(
-          Zen.And(
-            Zen.Or(checker.PhiAnnotations[src](srcState), checker.PsiAnnotations[src](srcState)),
-            checker.PsiAnnotations[dst](dstState)),
-          checker.PsiAnnotations[dst](newDstState));
-        var livenessCheck = Zen.Implies(
-          Zen.And(
-            checker.Ranks[src] < checker.Ranks[dst],
-            Zen.Or(checker.PhiAnnotations[dst](dstState), checker.PsiAnnotations[dst](dstState)),
-            checker.PsiAnnotations[src](srcState)),
-          checker.PsiAnnotations[dst](newDstState));
+        var preCheck = checker.PreCheckCondition(src, dst, srcState, dstState, newDstState);
+        var postCheck = checker.PostCheckCondition(src, dst, srcState, dstState, newDstState);
+        var livenessCheck = checker.LivenessCheckCondition(src, dst, srcState, dstState, newDstState);
 
         model = Zen.And(constraint, Zen.Not(preCheck)).Solve();
         if (!model.IsSatisfiable()) model = Zen.And(constraint, Zen.Not(postCheck)).Solve();

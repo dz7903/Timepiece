@@ -48,6 +48,7 @@ public static class Benchmark
           Zen.And(
             r.GetResultValue(),
             r.GetWeight() == RouteEnvironment.DefaultWeight,
+            r.GetLp() == RouteEnvironment.DefaultLp,
             r.GetAsPathLength() == ranks[n]
           )));
     return checker;
