@@ -37,6 +37,7 @@ rootCommand.SetHandler(
     var checker = bench switch {
       "reach" => Benchmark.Reach(config),
       "aslength" => Benchmark.ASLength(config),
+      "vf" => Benchmark.ValleyFree(config),
       _ => throw new ArgumentException($"no benchmark named {bench}")
     };
 

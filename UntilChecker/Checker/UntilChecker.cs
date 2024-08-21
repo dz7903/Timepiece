@@ -147,7 +147,7 @@ public class EdgeError<NodeType, RouteType, NetworkType>(
 
 public static class UntilCheckerExtension
 {
-  public static void Repair(
+  public static bool Repair(
     this UntilChecker<string, RouteEnvironment, CiscoNetwork> checker,
     string task,
     CheckError err,
@@ -242,7 +242,7 @@ public static class UntilCheckerExtension
           Console.Out.WriteLine($"repaired import policy: {importProposal.Debug()}");
           Console.Out.WriteLine($"repaired export policy: {exportPolicy.Debug()}");
           Console.Out.WriteLine("----------------------");
-          return;
+          return true;
         }
       }
       else
@@ -253,6 +253,7 @@ public static class UntilCheckerExtension
     }
     Console.Out.WriteLine("repair failed, sorry!");
     Console.Out.WriteLine("please try to change arguments of template generation");
+    return false;
   }
 
   public static void CheckAndRepair(
@@ -262,14 +263,20 @@ public static class UntilCheckerExtension
     var errors = checker.Check();
     var globalTimer = Stopwatch.StartNew();
     var timeCollector = new Dictionary<string, long>(errors.Count);
+    var failedCount = 0;
     foreach (var p in errors)
     {
       var localTimer = Stopwatch.StartNew();
-      Repair(checker, p.Key, p.Value, args);
+      var result = Repair(checker, p.Key, p.Value, args);
       timeCollector[p.Key] = localTimer.ElapsedMilliseconds;
+      if (!result) failedCount++;
     }
     var wallTime = globalTimer.ElapsedMilliseconds;
-    Console.WriteLine($"All repair tasks ended. Total time used: {wallTime} ms");
+    Console.WriteLine($"All repairs ended. Total time used: {wallTime} ms");
     StatisticsExtensions.ReportTimes(timeCollector, Statistics.Summary, wallTime, true);
+    if (failedCount == 0)
+      Console.WriteLine("All repairs succeed. Congrats!");
+    else
+      Console.WriteLine($"{failedCount}/{errors.Count} repairs failed. Please try to change template generation arguments.");
   }
 }

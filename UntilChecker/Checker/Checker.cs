@@ -19,7 +19,7 @@ public abstract class Checker<NodeType, RouteType, NetworkType>(NetworkType netw
     var processes = Environment.ProcessorCount;
     Trace.WriteLine($"Environment.ProcessorCount: {processes}");
     var tasks = GenerateTasks();
-    Trace.WriteLine($"{tasks.Count} tasks generated.");
+    Trace.WriteLine($"{tasks.Count} checks generated.");
     var timeCollector = new ConcurrentDictionary<string, long>(processes * 2, tasks.Count);
     var errorCollector = new ConcurrentDictionary<string, CheckError>(processes * 2, tasks.Count);
 
@@ -33,17 +33,17 @@ public abstract class Checker<NodeType, RouteType, NetworkType>(NetworkType netw
         errorCollector[p.Key] = result.Value;
     });
     var wallTime = globalTimer.ElapsedMilliseconds;
-    Console.WriteLine($"All tasks ended. Total time used: {wallTime} ms");
+    Console.WriteLine($"All checks ended. Total time used: {wallTime} ms");
     StatisticsExtensions.ReportTimes(timeCollector, Statistics.Summary, wallTime, true);
 
     if (errorCollector.IsEmpty)
-      Console.WriteLine("All tasks passed. Congrats!");
+      Console.WriteLine("All checks passed. Congrats!");
     else
     {
-      Console.WriteLine($"{errorCollector.Count} tasks failed.");
+      Console.WriteLine($"{errorCollector.Count}/{tasks.Count} checks failed.");
       foreach (var (task, err) in errorCollector)
       {
-        Console.WriteLine($"task {task} failed");
+        Console.WriteLine($"check task {task} failed");
         err.Report();
         Console.WriteLine();
       }
