@@ -87,16 +87,16 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
         var result = Zen.And(constraint, Zen.Not(preCheck)).Solve();
         if (result.IsSatisfiable())
           return Option.Some<CheckError>(new EdgeError<NodeType, RouteType, NetworkType>(
-            this, "pre-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics));
+            "pre-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics));
         result = Zen.And(constraint, Zen.Not(postCheck)).Solve();
         if (result.IsSatisfiable())
           return Option.Some<CheckError>(new EdgeError<NodeType, RouteType, NetworkType>(
-            this, "post-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics));
+            "post-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics));
         result = Zen.And(constraint, Zen.Not(livenessCheck)).Solve();
 
         return result.IsSatisfiable()
           ? Option.Some<CheckError>(new EdgeError<NodeType, RouteType, NetworkType>(
-            this, "liveness-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics))
+            "liveness-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics))
           : Option.None<CheckError>();
       });
     }
@@ -117,7 +117,6 @@ public class NodeError<NodeType, RouteType>(
 }
 
 public class EdgeError<NodeType, RouteType, NetworkType>(
-  UntilChecker<NodeType, RouteType, NetworkType> checker,
   string kind,
   ZenSolution model,
   NodeType src,
@@ -151,16 +150,19 @@ public static class UntilCheckerExtension
     this UntilChecker<string, RouteEnvironment, CiscoNetwork> checker,
     string task,
     CheckError err,
-    TemplateArguments args)
+    TemplateArguments args,
+    bool quiet)
   {
     EdgeError<string, RouteEnvironment, CiscoNetwork> error;
     try
     {
       error = (EdgeError<string, RouteEnvironment, CiscoNetwork>)err;
     }
-    catch (InvalidCastException e)
+    catch (InvalidCastException)
     {
-      throw new NotSupportedException($"error at {task} is not repairable");
+      Console.WriteLine($"error at {task} is not repairable.");
+      Console.Out.WriteLine("----------------------");
+      return false;
     }
 
     var src = error.Src;
@@ -171,20 +173,25 @@ public static class UntilCheckerExtension
 
     var exportPolicy = config.NodeConfigs[src].Polices[dst].ExportPolicy;
     var importPolicy = config.NodeConfigs[dst].Polices[src].ImportPolicy;
-    Console.WriteLine($"export policy to be repaired:\n{exportPolicy.Debug()}");
-    Console.WriteLine($"import policy to be repaired:\n{importPolicy.Debug()}");
-    Console.WriteLine($"rank of src {src} is {error.Model.Get(checker.Ranks[src])}");
-    Console.WriteLine($"rank of dst {dst} is {error.Model.Get(checker.Ranks[dst])}");
+    if (!quiet)
+    {
+      Console.WriteLine($"export policy to be repaired:\n{exportPolicy.Debug()}");
+      Console.WriteLine($"import policy to be repaired:\n{importPolicy.Debug()}");
+      Console.WriteLine($"rank of src {src} is {error.Model.Get(checker.Ranks[src])}");
+      Console.WriteLine($"rank of dst {dst} is {error.Model.Get(checker.Ranks[dst])}");
+    }
 
     var exportTemplate = exportPolicy.GenerateTemplate(args);
     var importTemplate = importPolicy.GenerateTemplate(args);
 
     List<(RouteEnvironment, RouteEnvironment)> counterExamples = [(error.SrcState, error.DstState)];
-    Console.WriteLine($"counter example:\n  src {src} = {error.SrcState}\n  dst {dst} = {error.DstState}");
+    if (!quiet)
+      Console.WriteLine($"counter example:\n  src {src} = {error.SrcState}\n  dst {dst} = {error.DstState}");
 
     for (int i = 0; i < args.MaxRetry; i++)
     {
-      Console.WriteLine($"Start {i}-th repair...");
+      if (!quiet)
+        Console.WriteLine($"Start {i}-th repair...");
       var model = Zen.Minimize(
         exportTemplate.Cost + importTemplate.Cost,
         Zen.And(
@@ -210,9 +217,13 @@ public static class UntilCheckerExtension
       {
         var exportProposal = exportTemplate.Repair(model);
         var importProposal = importTemplate.Repair(model);
-        Console.Out.WriteLine("proposal generated");
-        Console.Out.WriteLine($"export policy proposal:\n{exportProposal.Debug()}");
-        Console.Out.WriteLine($"import policy proposal:\n{importProposal.Debug()}");
+
+        if (!quiet)
+        {
+          Console.Out.WriteLine("proposal generated");
+          Console.Out.WriteLine($"export policy proposal:\n{exportProposal.Debug()}");
+          Console.Out.WriteLine($"import policy proposal:\n{importProposal.Debug()}");
+        }
 
         var srcState = Zen.Symbolic<RouteEnvironment>("srcState");
         var dstState = Zen.Symbolic<RouteEnvironment>("dstState");
@@ -231,43 +242,60 @@ public static class UntilCheckerExtension
 
         if (model.IsSatisfiable())
         {
-          Console.Out.WriteLine("proposal failed!");
-          Console.Out.WriteLine($"failed model: {model.VariableAssignment}");
-          Console.Out.WriteLine($"counterexample\n  src {src} = {model.Get(srcState)}\n  dst {dst} = {model.Get(dstState)}");
+          if (!quiet)
+          {
+            Console.Out.WriteLine("proposal failed!");
+            Console.Out.WriteLine($"failed model: {model.VariableAssignment}");
+            Console.Out.WriteLine(
+              $"counterexample\n  src {src} = {model.Get(srcState)}\n  dst {dst} = {model.Get(dstState)}");
+          }
+
           counterExamples.Add((model.Get(srcState), model.Get(dstState)));
         }
         else
         {
-          Console.Out.WriteLine("repair succeed!");
-          Console.Out.WriteLine($"repaired import policy: {importProposal.Debug()}");
-          Console.Out.WriteLine($"repaired export policy: {exportPolicy.Debug()}");
-          Console.Out.WriteLine("----------------------");
+          if (!quiet)
+          {
+            Console.Out.WriteLine("repair succeed!");
+            Console.Out.WriteLine($"repaired import policy: {importProposal.Debug()}");
+            Console.Out.WriteLine($"repaired export policy: {exportPolicy.Debug()}");
+            Console.Out.WriteLine("----------------------");
+          }
+
           return true;
         }
       }
       else
       {
-        Console.Out.WriteLine("repair is impossible for this template");
+        if (!quiet)
+          Console.Out.WriteLine("repair is impossible for this template");
         break;
       }
     }
-    Console.Out.WriteLine("repair failed, sorry!");
-    Console.Out.WriteLine("please try to change arguments of template generation");
+
+    if (!quiet)
+    {
+      Console.Out.WriteLine("repair failed, sorry!");
+      Console.Out.WriteLine("please try to change arguments of template generation");
+      Console.Out.WriteLine("----------------------");
+    }
+
     return false;
   }
 
   public static void CheckAndRepair(
     this UntilChecker<string, RouteEnvironment, CiscoNetwork> checker,
-    TemplateArguments args)
+    TemplateArguments args,
+    bool quiet)
   {
-    var errors = checker.Check();
+    var errors = checker.Check(quiet);
     var globalTimer = Stopwatch.StartNew();
     var timeCollector = new Dictionary<string, long>(errors.Count);
     var failedCount = 0;
     foreach (var p in errors)
     {
       var localTimer = Stopwatch.StartNew();
-      var result = Repair(checker, p.Key, p.Value, args);
+      var result = Repair(checker, p.Key, p.Value, args, quiet);
       timeCollector[p.Key] = localTimer.ElapsedMilliseconds;
       if (!result) failedCount++;
     }

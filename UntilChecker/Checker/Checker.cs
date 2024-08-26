@@ -14,7 +14,7 @@ public abstract class Checker<NodeType, RouteType, NetworkType>(NetworkType netw
 
   protected abstract IDictionary<string, Func<Option<CheckError>>> GenerateTasks();
 
-  public IDictionary<string, CheckError> Check()
+  public IDictionary<string, CheckError> Check(bool quiet)
   {
     var processes = Environment.ProcessorCount;
     Trace.WriteLine($"Environment.ProcessorCount: {processes}");
@@ -41,12 +41,15 @@ public abstract class Checker<NodeType, RouteType, NetworkType>(NetworkType netw
     else
     {
       Console.WriteLine($"{errorCollector.Count}/{tasks.Count} checks failed.");
-      foreach (var (task, err) in errorCollector)
-      {
-        Console.WriteLine($"check task {task} failed");
-        err.Report();
-        Console.WriteLine();
-      }
+      Console.WriteLine();
+
+      if (!quiet)
+        foreach (var (task, err) in errorCollector)
+        {
+          Console.WriteLine($"check task {task} failed");
+          err.Report();
+          Console.WriteLine();
+        }
     }
     return errorCollector;
   }

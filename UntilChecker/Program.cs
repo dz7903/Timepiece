@@ -21,13 +21,16 @@ var benchArgument = new Argument<string>(
 var noRepairOption = new Option<bool>(
   ["--no-repair"],
   "check without any repair");
+var quietOption = new Option<bool>(
+  ["-q", "--quiet"]);
 
 rootCommand.AddArgument(fileArgument);
 rootCommand.AddArgument(benchArgument);
 rootCommand.AddOption(noRepairOption);
+rootCommand.AddOption(quietOption);
 
 rootCommand.SetHandler(
-  (file, bench, noRepair) =>
+  (file, bench, noRepair, quiet) =>
   {
     var reader = new JsonTextReader(new StreamReader(file));
     var serializer = new JsonSerializer();
@@ -38,14 +41,15 @@ rootCommand.SetHandler(
       "reach" => Benchmark.Reach(config),
       "aslength" => Benchmark.ASLength(config),
       "vf" => Benchmark.ValleyFree(config),
+      "hijack" => Benchmark.Hijack(config),
       _ => throw new ArgumentException($"no benchmark named {bench}")
     };
 
     var args = new TemplateArguments(5, ["1:0", "1:1", "1:2"], 2, 0, 2);
     if (noRepair)
-      checker.Check();
+      checker.Check(quiet);
     else
-      checker.CheckAndRepair(args);
-  }, fileArgument, benchArgument, noRepairOption);
+      checker.CheckAndRepair(args, quiet);
+  }, fileArgument, benchArgument, noRepairOption, quietOption);
 
 rootCommand.Invoke(args);

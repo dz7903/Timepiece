@@ -117,13 +117,15 @@ public record Clause(
   private static bool IsPermit(ClauseAction action) => action switch
     {
       ClauseAction.Deny => false,
-      ClauseAction.Permit => true
+      ClauseAction.Permit => true,
+      _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
     };
 
   private static ClauseAction Toggle(ClauseAction action) => action switch
     {
       ClauseAction.Deny => ClauseAction.Permit,
-      ClauseAction.Permit => ClauseAction.Deny
+      ClauseAction.Permit => ClauseAction.Deny,
+      _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
     };
 
   public string Debug()
@@ -155,7 +157,7 @@ public enum ClauseAction
 
 [JsonConverter(typeof(JsonSubtypes), "type")]
 [JsonSubtypes.KnownSubType(typeof(MatchCommunity), "community_list")]
-[JsonSubtypes.KnownSubType(typeof(MatchIpPrefix), "ip_prefix_list")]
+[JsonSubtypes.KnownSubType(typeof(MatchIpPrefix), "ip_prefix")]
 public abstract record MatchLine
 {
   public abstract Zen<bool> Match(Zen<RouteEnvironment> r);
@@ -198,7 +200,7 @@ public record MatchCommunity(
 
 [method: JsonConstructor]
 public record MatchIpPrefix(
-  [JsonProperty("ip_prefixes", Required = Required.Always)]
+  [JsonProperty("ip_prefix", Required = Required.Always)]
   List<string> Prefixes) : MatchLine
 {
   private readonly List<Ipv4Prefix> prefixes = Prefixes.Select(prefix => new Ipv4Prefix(prefix)).ToList();

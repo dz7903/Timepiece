@@ -13,7 +13,7 @@ public static class ZenExtension
 
   public static Zen<bool> Or(IEnumerable<Zen<bool>>? exprs)
   {
-    if (exprs == null) return Zen.True();
+    if (exprs == null) return Zen.False();
     var enumerable = exprs.ToList();
     return !enumerable.Any() ? Zen.False() : Zen.Or(enumerable);
   }

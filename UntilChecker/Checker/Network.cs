@@ -33,23 +33,23 @@ public class CiscoNetwork(
 {
   public readonly Configruation Config = config;
 
-  public static CiscoNetwork StaticDest(Configruation config, string dest, SymbolicValue<RouteEnvironment> symDestInit)
+  public static CiscoNetwork StaticDest(Configruation config, string dest, SymbolicValue<RouteEnvironment> destRoute)
   {
     return new CiscoNetwork(
       config,
       config.ToDigraph().MapNodes(
-        n => n == dest ? symDestInit.Value : Zen.Constant(new RouteEnvironment())),
-      [symDestInit]);
+        n => n == dest ? destRoute.Value : Zen.Constant(new RouteEnvironment())),
+      [destRoute]);
   }
 
-  public static CiscoNetwork DynamicDest(Configruation config, SymbolicValue<RouteEnvironment> symDestInit)
+  public static CiscoNetwork DynamicDest(Configruation config, SymbolicValue<RouteEnvironment> destRoute)
   {
     var digraph = config.ToDigraph();
-    var symDest = new SymbolicValue<string>("dest", dest => Zen.Or(digraph.Nodes.Select(n => n == dest)));
+    var dest = new SymbolicValue<string>("dest", dest => Zen.Or(digraph.Nodes.Select(n => n == dest)));
     return new CiscoNetwork(
       config,
-      digraph.MapNodes(n => Zen.If(n == symDest.Value, symDestInit.Value, Zen.Constant(new RouteEnvironment()))),
-      [symDest, symDestInit]);
+      digraph.MapNodes(n => Zen.If(n == dest.Value, destRoute.Value, Zen.Constant(new RouteEnvironment()))),
+      [dest, destRoute]);
   }
 }
 
