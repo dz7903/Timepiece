@@ -10,25 +10,54 @@ using ZenLib.ModelChecking;
 
 namespace UntilChecker.Checker;
 
-public class UntilChecker<NodeType, RouteType, NetworkType>(
-  NetworkType network,
-  IDictionary<NodeType, Zen<BigInteger>> ranks,
-  IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> phiAnnotations,
-  IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> psiAnnotations) :
-  Checker<NodeType, RouteType, NetworkType>(network)
+public class UntilChecker<NodeType, RouteType, NetworkType> :
+  Checker<NodeType, RouteType, NetworkType>
   where NodeType: notnull
   where NetworkType : Network<NodeType, RouteType>
 {
-  public readonly IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> PhiAnnotations = phiAnnotations;
-  public readonly IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> PsiAnnotations = psiAnnotations;
-  public readonly IDictionary<NodeType, Zen<BigInteger>> Ranks = ranks;
+  public readonly IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> PhiAnnotations;
+  public readonly IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> PsiAnnotations;
+
+  public readonly IDictionary<(NodeType, NodeType), Zen<bool>> ConvergeBefore;
+
+  public UntilChecker(
+    NetworkType network,
+    IDictionary<(NodeType, NodeType), Zen<bool>> convergeBefore,
+    IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> phiAnnotations,
+    IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> psiAnnotations): base(network)
+  {
+    ConvergeBefore = convergeBefore;
+    PhiAnnotations = phiAnnotations;
+    PsiAnnotations = psiAnnotations;
+  }
+
+  public UntilChecker(
+    NetworkType network,
+    IDictionary<NodeType, Zen<BigInteger>> ranks,
+    IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> phiAnnotations,
+    IDictionary<NodeType, Func<Zen<RouteType>, Zen<bool>>> psiAnnotations) : base(network)
+  {
+    ConvergeBefore = network.Digraph.MapEdges(p => ranks[p.Item1] < ranks[p.Item2]);
+    PhiAnnotations = phiAnnotations;
+    PsiAnnotations = psiAnnotations;
+  }
+
+  public Zen<bool> InitialCheckCondition(NodeType node)
+  {
+    var noConvergeBefore = ZenExtension.And(Network.Digraph[node].Select(n =>
+      Zen.Not(ConvergeBefore[(n, node)])));
+    return Zen.If(
+      noConvergeBefore,
+      PsiAnnotations[node](Network.InitialRoutes[node]),
+      PhiAnnotations[node](Network.InitialRoutes[node]));
+  }
 
   public Zen<bool> PreCheckCondition(
     NodeType src, NodeType dst, Zen<RouteType> srcState, Zen<RouteType> dstState, Zen<RouteType> newDstState) =>
     Zen.Implies(
       Zen.And(
         Zen.Or(PhiAnnotations[src](srcState), PsiAnnotations[src](srcState)),
-        Zen.Implies(Ranks[src] > Ranks[dst], PhiAnnotations[src](srcState)),
+        Zen.Implies(ConvergeBefore[(dst, src)], PhiAnnotations[src](srcState)),
         PhiAnnotations[dst](dstState)),
       Zen.Or(PhiAnnotations[dst](newDstState), PsiAnnotations[dst](newDstState)));
 
@@ -44,7 +73,7 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
     NodeType src, NodeType dst, Zen<RouteType> srcState, Zen<RouteType> dstState, Zen<RouteType> newDstState) =>
     Zen.Implies(
       Zen.And(
-        Ranks[src] < Ranks[dst],
+        ConvergeBefore[(src, dst)],
         Zen.Or(PhiAnnotations[dst](dstState), PsiAnnotations[dst](dstState)),
         PsiAnnotations[src](srcState)),
       PsiAnnotations[dst](newDstState));
@@ -58,16 +87,12 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
 
     foreach (var node in Network.Digraph.Nodes)
     {
-      var initCheck = Zen.If(
-        Ranks[node] == BigInteger.Zero,
-        PsiAnnotations[node](Network.InitialRoutes[node]),
-        PhiAnnotations[node](Network.InitialRoutes[node]));
+      var initCheck = InitialCheckCondition(node);
       tasks.Add($"init-{node}", () =>
       {
         var result = Zen.And(constraint, Zen.Not(initCheck)).Solve();
         return result.IsSatisfiable()
-          ? Option.Some<CheckError>(new NodeError<NodeType, RouteType>(
-            result, node, Network.InitialRoutes[node], Network.Symbolics))
+          ? Option.Some<CheckError>(new NodeError<NodeType, RouteType, NetworkType>(this, result, node, Network.InitialRoutes[node]))
           : Option.None<CheckError>();
       });
     }
@@ -80,6 +105,8 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
 
       var preCheck = PreCheckCondition(neighbor, node, routes[neighbor], routes[node], newRoute);
       var postCheck = PostCheckCondition(neighbor, node, routes[neighbor], routes[node], newRoute);
+      if (neighbor.ToString() == "r1239" && node.ToString() == "r1241")
+        Console.WriteLine($"r1239 to r1241!!!");
       var livenessCheck = LivenessCheckCondition(neighbor, node, routes[neighbor], routes[node], newRoute);
 
       tasks.Add($"edge-{neighbor},{node}", () =>
@@ -87,16 +114,16 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
         var result = Zen.And(constraint, Zen.Not(preCheck)).Solve();
         if (result.IsSatisfiable())
           return Option.Some<CheckError>(new EdgeError<NodeType, RouteType, NetworkType>(
-            "pre-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics));
+            "pre-check", this, result, neighbor, node, routes[neighbor], routes[node], newRoute));
         result = Zen.And(constraint, Zen.Not(postCheck)).Solve();
         if (result.IsSatisfiable())
           return Option.Some<CheckError>(new EdgeError<NodeType, RouteType, NetworkType>(
-            "post-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics));
+            "post-check", this, result, neighbor, node, routes[neighbor], routes[node], newRoute));
         result = Zen.And(constraint, Zen.Not(livenessCheck)).Solve();
 
         return result.IsSatisfiable()
           ? Option.Some<CheckError>(new EdgeError<NodeType, RouteType, NetworkType>(
-            "liveness-check", result, neighbor, node, routes[neighbor], routes[node], newRoute, Network.Symbolics))
+            "liveness-check", this, result, neighbor, node, routes[neighbor], routes[node], newRoute))
           : Option.None<CheckError>();
       });
     }
@@ -105,26 +132,29 @@ public class UntilChecker<NodeType, RouteType, NetworkType>(
   }
 }
 
-public class NodeError<NodeType, RouteType>(
-  ZenSolution model, NodeType node, Zen<RouteType> route, IEnumerable<ISymbolic> symbolics) : CheckError
+public class NodeError<NodeType, RouteType, NetworkType>(
+  UntilChecker<NodeType, RouteType, NetworkType> checker,
+  ZenSolution model,
+  NodeType node, Zen<RouteType> route) : CheckError
+  where NetworkType: Network<NodeType, RouteType>
 {
   public override void Report()
   {
     Console.WriteLine($"node check at {node}");
     Console.WriteLine($"node {node} has route := {model.Get(route)}");
-    foreach (var sym in symbolics) Console.WriteLine($"symbolic {sym.Name} := {sym.GetSolution(model)}");
+    foreach (var sym in checker.Network.Symbolics) Console.WriteLine($"symbolic {sym.Name} := {sym.GetSolution(model)}");
   }
 }
 
 public class EdgeError<NodeType, RouteType, NetworkType>(
   string kind,
+  UntilChecker<NodeType, RouteType, NetworkType> checker,
   ZenSolution model,
   NodeType src,
   NodeType dst,
   Zen<RouteType> srcRoute,
   Zen<RouteType> dstRoute,
-  Zen<RouteType> newDstRoute,
-  IEnumerable<ISymbolic> symbolics) : CheckError
+  Zen<RouteType> newDstRoute) : CheckError
   where NetworkType : Network<NodeType, RouteType>
 {
   public readonly ZenSolution Model = model;
@@ -139,7 +169,9 @@ public class EdgeError<NodeType, RouteType, NetworkType>(
     Console.WriteLine($"node {Src} has route := {SrcState}");
     Console.WriteLine($"node {Dest} has route := {DstState}");
     Console.WriteLine($"after update, {Dest} has new route := {Model.Get(newDstRoute)}");
-    foreach (var sym in symbolics)
+    Console.WriteLine($"{Src} converge before {Dest}: {Model.Get(checker.ConvergeBefore[(Src, Dest)])}");
+    Console.WriteLine($"{Dest} converge before {Src}: {Model.Get(checker.ConvergeBefore[(Dest, Src)])}");
+    foreach (var sym in checker.Network.Symbolics)
       Console.WriteLine($"symbolic {sym.Name} := {sym.GetSolution(Model)}");
   }
 }
@@ -177,8 +209,8 @@ public static class UntilCheckerExtension
     {
       Console.WriteLine($"export policy to be repaired:\n{exportPolicy.Debug()}");
       Console.WriteLine($"import policy to be repaired:\n{importPolicy.Debug()}");
-      Console.WriteLine($"rank of src {src} is {error.Model.Get(checker.Ranks[src])}");
-      Console.WriteLine($"rank of dst {dst} is {error.Model.Get(checker.Ranks[dst])}");
+      // Console.WriteLine($"rank of src {src} is {error.Model.Get(checker.Ranks[src])}");
+      // Console.WriteLine($"rank of dst {dst} is {error.Model.Get(checker.Ranks[dst])}");
     }
 
     var exportTemplate = exportPolicy.GenerateTemplate(args);
