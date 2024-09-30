@@ -24,13 +24,13 @@ public record Template<TTransfer, TRep>(
 public record Configruation (
   IDictionary<string, Node> NodeConfigs)
 {
-  public Zen<RouteEnvironment> TransferFunction(string src, string dst, Zen<RouteEnvironment> r)
+  public Zen<BgpRoute> TransferFunction(string src, string dst, Zen<BgpRoute> r)
   {
     var exportPolicy = NodeConfigs[src].Polices[dst].ExportPolicy;
     var importPolicy = NodeConfigs[dst].Polices[src].ImportPolicy;
     return importPolicy.Transfer(exportPolicy.Transfer(r))
-      .IncrementAsPathLength(BigInteger.One)
-      .AddAsSet(NodeConfigs[src].LocalAs);
+      .IncreaseAsLength()
+      .AddAs(NodeConfigs[src].LocalAs);
   }
 
   public Digraph<string> ToDigraph()
@@ -67,15 +67,15 @@ public record Policy(
 
 public static class RouteMap
 {
-  public static Zen<RouteEnvironment> Transfer(this List<Clause> routeMap, Zen<RouteEnvironment> r)
+  public static Zen<BgpRoute> Transfer(this List<Clause> routeMap, Zen<BgpRoute> r)
   {
     var result = Enumerable.Reverse(routeMap).Aggregate(
-      Zen.Constant(new RouteEnvironment()),
+      Zen.Constant(BgpRoute.NoRoute()),
       (after, clause) => clause.TransferFunction(r, after));
     return result;
   }
 
-  public static Template<Func<Zen<RouteEnvironment>, Zen<RouteEnvironment>>, List<Clause>> GenerateTemplate(
+  public static Template<Func<Zen<BgpRoute>, Zen<BgpRoute>>, List<Clause>> GenerateTemplate(
     this List<Clause> routeMap, TemplateArguments args)
   {
     // (template, disable)
@@ -83,10 +83,10 @@ public static class RouteMap
     var lastSeqNum = routeMap.Count != 0 ? routeMap.Last().SeqNum : 0;
     var extraTemplates = Enumerable.Range(0, args.ExtraClauses)
       .Select(i => Clause.GenerateFreshTemplate(args, $"generated{i}", lastSeqNum + 10 * i));
-    return new Template<Func<Zen<RouteEnvironment>, Zen<RouteEnvironment>>, List<Clause>>(
+    return new Template<Func<Zen<BgpRoute>, Zen<BgpRoute>>, List<Clause>>(
       r =>
         Enumerable.Reverse(templates).Aggregate(
-          Zen.Constant(new RouteEnvironment()),
+          Zen.Constant(BgpRoute.NoRoute()),
           (after, p) =>
             Zen.If(p.Item2, after, p.Item1.TransferFunction(r, after))),
       templates.Aggregate(

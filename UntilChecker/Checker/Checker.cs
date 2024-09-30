@@ -6,11 +6,11 @@ using ZenLib;
 namespace UntilChecker.Checker;
 
 
-public abstract class Checker<NodeType, RouteType, NetworkType>(NetworkType network)
-  where NodeType : notnull
-  where NetworkType : Network<NodeType, RouteType>
+public abstract class Checker<TNode, TRoute, TSym, TNetwork>(TNetwork network)
+  where TNode : notnull
+  where TNetwork : Network<TNode, TRoute, TSym>
 {
-  public readonly NetworkType Network = network;
+  public readonly TNetwork Network = network;
 
   protected abstract IDictionary<string, Func<Option<CheckError>>> GenerateTasks();
 
@@ -55,7 +55,7 @@ public abstract class Checker<NodeType, RouteType, NetworkType>(NetworkType netw
   }
 }
 
-public abstract class CheckError
+public abstract record CheckError
 {
   public abstract void Report();
 }

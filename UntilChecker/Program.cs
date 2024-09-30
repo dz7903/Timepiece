@@ -42,33 +42,49 @@ rootCommand.SetHandler(
     var config = new Configruation(
       serializer.Deserialize<Dictionary<string, Node>>(reader) ?? throw new FormatException($"failed to deserialize {file}"));
 
-    UntilChecker<string, RouteEnvironment, CiscoNetwork> checker;
+    var args = new TemplateArguments(5, ["1:0", "1:1", "1:2"], 2, 2, 2);
+
     switch (bench)
     {
       case "reach":
-        checker = Benchmark.Reach(config);
+      {
+        var checker = Benchmark.Reach(config, dests);
+        checker.CheckAndRepair(args, quiet, noRepair);
         break;
-      case "aslength":
-        checker = Benchmark.ASLength(config);
-        break;
-      case "vf":
-        checker = Benchmark.ValleyFree(config);
-        break;
-      case "hijack":
-        checker = Benchmark.Hijack(config);
-        break;
-      case "wan":
-        var dest = dests[0];
-        checker = Benchmark.WanSingleDest(config, dest);
-        break;
-      default: throw new ArgumentException($"no benchmark named {bench}");
-    }
+      }
 
-    var args = new TemplateArguments(5, ["1:0", "1:1", "1:2"], 2, 0, 2);
-    if (noRepair)
-      checker.Check(quiet);
-    else
-      checker.CheckAndRepair(args, quiet);
+      case "aslength":
+      {
+        var checker = Benchmark.AsLength(config, dests);
+        checker.CheckAndRepair(args, quiet, noRepair);
+        break;
+      }
+
+      case "vf":
+      {
+        var checker = Benchmark.ValleyFree(config, dests);
+        checker.CheckAndRepair(args, quiet, noRepair);
+        break;
+      }
+
+      case "hijack":
+      {
+        var checker = Benchmark.Hijack(config, dests);
+        checker.CheckAndRepair(args, quiet, noRepair);
+        break;
+      }
+
+      case "reach-symbolic":
+      {
+        var checker = Benchmark.ReachSymbolic(config);
+        checker.CheckAndRepair(args, quiet, noRepair);
+        break;
+      }
+
+      default:
+        throw new ArgumentException($"no benchmark called {bench}");
+    }
+    
   }, fileArgument, benchArgument, destArgument, noRepairOption, quietOption);
 
 rootCommand.Invoke(args);
