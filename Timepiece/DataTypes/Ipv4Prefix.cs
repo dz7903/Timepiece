@@ -136,4 +136,9 @@ public static class Ipv4PrefixExtensions
     return Zen.Constant(prefix.ToWildcard()).MatchesPrefix(otherPrefix, prefix.PrefixLength,
       exact ? prefix.PrefixLength : new UInt<_6>(32));
   }
+
+  public static Zen<bool> Matches1(this Zen<Ipv4Prefix> prefix, Zen<Ipv4Prefix> otherPrefix)
+  {
+    return prefix == otherPrefix;
+  }
 }
